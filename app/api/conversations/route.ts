@@ -1,0 +1,45 @@
+import { createClient } from "@supabase/supabase-js"
+import { type NextRequest, NextResponse } from "next/server"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const tenantId = searchParams.get("tenantId")
+
+    if (!tenantId) {
+      return NextResponse.json({ error: "tenantId required" }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from("conversations")
+      .select(`
+        *,
+        contacts(id, phone_number, first_name, last_name),
+        messages(count)
+      `)
+      .eq("tenant_id", tenantId)
+      .order("last_message_at", { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json(data)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+
+    const { data, error } = await supabase.from("conversations").insert(body).select().single()
+
+    if (error) throw error
+
+    return NextResponse.json(data, { status: 201 })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+}
